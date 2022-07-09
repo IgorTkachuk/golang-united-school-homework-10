@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -21,10 +22,55 @@ main function reads host/port from env just for an example, flavor it following 
 func Start(host string, port int) {
 	router := mux.NewRouter()
 
+	router.HandleFunc("/name/{PARAM}", paramHandler).Methods(http.MethodGet)
+	router.HandleFunc("/bad", badHandler).Methods(http.MethodGet)
+	router.HandleFunc("/data", dataPostHandler).Methods(http.MethodPost)
+	router.HandleFunc("/headers", headersPostHandler).Methods(http.MethodPost)
+	router.HandleFunc("/", rootHandler).Methods(http.MethodGet)
+	router.NotFoundHandler = http.HandlerFunc(notFound)
+
 	log.Println(fmt.Printf("Starting API server on %s:%d\n", host, port))
 	if err := http.ListenAndServe(fmt.Sprintf("%s:%d", host, port), router); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func rootHandler (w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
+}
+
+func badHandler (w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusInternalServerError)
+}
+
+func paramHandler (w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	param := mux.Vars(r)["PARAM"]
+	w.Write([]byte("Hello, " + param + "!"))
+}
+
+func dataPostHandler (w http.ResponseWriter, r *http.Request) {
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+	
+	w.WriteHeader(http.StatusOK)
+	w.Write(append([]byte("I got message:\n"), b...))
+}
+
+func headersPostHandler (w http.ResponseWriter, r *http.Request) {
+	a, _ := strconv.Atoi(r.Header.Get("a"))
+	b, _ := strconv.Atoi(r.Header.Get("b"))
+
+	w.Header().Set("a+b", strconv.Itoa(a + b))
+	w.WriteHeader(http.StatusOK)
+}
+
+func notFound (w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(""))
 }
 
 //main /** starts program, gets HOST:PORT param and calls Start func.
